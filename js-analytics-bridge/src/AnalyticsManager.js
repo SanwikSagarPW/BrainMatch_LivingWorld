@@ -13,8 +13,16 @@ class AnalyticsManager {
     
     this._reportData = {
       gameId: '',
+      sessionId: '',
+      timestamp: '',
       name: '',
       xpEarnedTotal: 0,
+      xpEarned: 0,
+      xpTotal: 0,
+      bestXp: 0,
+      lastPlayedLevel: '',
+      highestLevelPlayed: '',
+      perLevelAnalytics: {},
       rawData: [],
       diagnostics: {
         levels: []
@@ -41,10 +49,18 @@ class AnalyticsManager {
     this._sessionName = sessionName;
     
     this._reportData.gameId = gameId;
+    this._reportData.sessionId = sessionName;
+    this._reportData.timestamp = new Date().toISOString();
     this._reportData.name = sessionName;
+    this._reportData.xpEarnedTotal = 0;
+    this._reportData.xpEarned = 0;
+    this._reportData.xpTotal = 0;
+    this._reportData.bestXp = 0;
+    this._reportData.lastPlayedLevel = '';
+    this._reportData.highestLevelPlayed = '';
+    this._reportData.perLevelAnalytics = {};
     this._reportData.diagnostics.levels = [];
     this._reportData.rawData = [];
-    this._reportData.xpEarnedTotal = 0;
     
     this._isInitialized = true;
     console.log(`[Analytics] Initialized for: ${gameId}`);
@@ -84,6 +100,28 @@ class AnalyticsManager {
     };
     
     this._reportData.diagnostics.levels.push(levelEntry);
+    
+    // Initialize per-level analytics if not exists
+    if (!this._reportData.perLevelAnalytics[levelId]) {
+      this._reportData.perLevelAnalytics[levelId] = {
+        attempts: 0,
+        wins: 0,
+        losses: 0,
+        totalTimeMs: 0,
+        bestTimeMs: Infinity,
+        totalXp: 0,
+        averageTimeMs: 0
+      };
+    }
+    
+    // Increment attempts
+    this._reportData.perLevelAnalytics[levelId].attempts++;
+    
+    // Update lastPlayedLevel
+    this._reportData.lastPlayedLevel = levelId;
+    
+    // Update highestLevelPlayed (extract level number from campaign_level_X)
+    this._updateHighestLevel(levelId);
   }
   
   /**
@@ -103,6 +141,33 @@ class AnalyticsManager {
       
       // Update global session totals
       this._reportData.xpEarnedTotal += xp;
+      this._reportData.xpEarned = this._reportData.xpEarnedTotal;
+      this._reportData.xpTotal = this._reportData.xpEarnedTotal;
+      this._reportData.bestXp = this._reportData.xpEarnedTotal;
+      
+      // Update per-level analytics
+      if (this._reportData.perLevelAnalytics[levelId]) {
+        const levelStats = this._reportData.perLevelAnalytics[levelId];
+        
+        // Update wins/losses
+        if (successful) {
+          levelStats.wins++;
+        } else {
+          levelStats.losses++;
+        }
+        
+        // Update time stats
+        levelStats.totalTimeMs += timeTakenMs;
+        if (successful && timeTakenMs < levelStats.bestTimeMs) {
+          levelStats.bestTimeMs = timeTakenMs;
+        }
+        
+        // Update XP
+        levelStats.totalXp += xp;
+        
+        // Calculate average time
+        levelStats.averageTimeMs = Math.round(levelStats.totalTimeMs / levelStats.attempts);
+      }
     } else {
       console.warn(`[Analytics] End Level called for unknown level: ${levelId}`);
     }
@@ -148,15 +213,20 @@ class AnalyticsManager {
       console.error('[Analytics] Attempted to submit without initialization.');
       return;
     }
+    
+    // Update timestamp to submission time
+    this._reportData.timestamp = new Date().toISOString();
+    
+    // Clean up perLevelAnalytics (convert Infinity to actual values)
+    Object.keys(this._reportData.perLevelAnalytics).forEach(levelId => {
+      const stats = this._reportData.perLevelAnalytics[levelId];
+      if (stats.bestTimeMs === Infinity) {
+        stats.bestTimeMs = 0;
+      }
+    });
+    
     // Build canonical payload
     const payload = JSON.parse(JSON.stringify(this._reportData));
-    // ensure canonical fields expected by hosts
-    if (!payload.sessionId) payload.sessionId = (Date.now() + '-' + Math.random().toString(36));
-    if (!payload.timestamp) payload.timestamp = new Date().toISOString();
-    // map existing fields to common names
-    payload.xpEarned = payload.xpEarned || payload.xpEarnedTotal || 0;
-    payload.xpTotal = payload.xpTotal || payload.xpEarnedTotal || 0;
-    payload.bestXp = payload.bestXp || payload.xpEarnedTotal || 0;
 
     // Try delivery via several bridges, best-effort. If window is not present (test/node), just return payload
     if (typeof window === 'undefined') {
@@ -252,6 +322,12 @@ class AnalyticsManager {
    */
   reset() {
     this._reportData.xpEarnedTotal = 0;
+    this._reportData.xpEarned = 0;
+    this._reportData.xpTotal = 0;
+    this._reportData.bestXp = 0;
+    this._reportData.lastPlayedLevel = '';
+    this._reportData.highestLevelPlayed = '';
+    this._reportData.perLevelAnalytics = {};
     this._reportData.rawData = [];
     this._reportData.diagnostics.levels = [];
     console.log('[Analytics] Data reset');
@@ -273,6 +349,28 @@ class AnalyticsManager {
       }
     }
     return null;
+  }
+  
+  /**
+   * Update the highest level played based on level ID
+   * @private
+   * @param {string} levelId
+   */
+  _updateHighestLevel(levelId) {
+    // Extract level number from campaign_level_X format
+    const match = levelId.match(/campaign_level_(\d+)/);
+    if (match) {
+      const currentLevel = parseInt(match[1], 10);
+      const highestMatch = this._reportData.highestLevelPlayed.match(/campaign_level_(\d+)/);
+      const highestNum = highestMatch ? parseInt(highestMatch[1], 10) : 0;
+      
+      if (currentLevel > highestNum) {
+        this._reportData.highestLevelPlayed = levelId;
+      }
+    } else if (!this._reportData.highestLevelPlayed) {
+      // For non-campaign levels, just set it if not already set
+      this._reportData.highestLevelPlayed = levelId;
+    }
   }
 }
 
