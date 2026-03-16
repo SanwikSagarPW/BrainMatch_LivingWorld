@@ -72,6 +72,7 @@ function stopBackgroundMusic() {
 
 // --- Game Content ---
 let gameContent = null;
+let gameManager = null; // Progress system manager
 
 // Load game content from JSON file
 async function loadGameContent() {
@@ -81,11 +82,60 @@ async function loadGameContent() {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     gameContent = await response.json();
+    
+    // Initialize Progress System
+    await initializeProgressSystem();
+    
     // Enable start button once content is loaded
     startCampaignButton.disabled = false;
   } catch (error) {
     console.error("Error loading game content:", error);
     alert("Error loading game content. Please refresh the page.");
+  }
+}
+
+// Initialize the Progress System
+async function initializeProgressSystem() {
+  try {
+    console.log('[Game] Initializing progress system...');
+    
+    // Create components
+    const progressBridge = new ProgressBridge({
+      useProvidedPayload: true, // Backend will provide payload (or set to false to use API)
+      apiUrl: CONFIG.api.progressUrl,
+      timeout: CONFIG.api.timeout,
+      retryAttempts: CONFIG.api.retryAttempts,
+      cacheDuration: CONFIG.api.cacheDuration
+    });
+    
+    const storageManager = new StorageManager({
+      storageKey: CONFIG.storage.storageKey,
+      useAsyncStorage: CONFIG.storage.useAsyncStorage
+    });
+    
+    const validator = new Validator({
+      minLevel: CONFIG.levels.minLevel,
+      maxLevel: CONFIG.levels.maxLevel
+    });
+    
+    // Create Game Manager
+    // Note: Analytics bridge is optional - the game uses a separate analytics integration
+    gameManager = new GameManager({
+      progressBridge,
+      storageManager,
+      validator,
+      analyticsBridge: null, // Analytics handled separately via analytics-integration.js
+      config: CONFIG
+    });
+    
+    // Initialize with backend payload (if available) or from storage
+    const result = await gameManager.initialize();
+    
+    console.log('[Game] Progress system initialized. Start level:', result.startLevel);
+    
+  } catch (error) {
+    console.error('[Game] Failed to initialize progress system:', error);
+    // Continue anyway - game will work without progress tracking
   }
 }
 
@@ -487,6 +537,20 @@ function handleCampaignWin() {
   const stars = calculateCampaignStars(level, gameState.turns);
   totalCampaignTurns += gameState.turns;
   totalCampaignXP += xp;
+  
+  // Save progress to the progress system
+  if (gameManager) {
+    gameManager.handleLevelComplete(level, {
+      xp: xp,
+      turns: gameState.turns,
+      stars: stars,
+      totalTurns: totalCampaignTurns,
+      totalXp: totalCampaignXP
+    }).catch(error => {
+      console.error('[Game] Failed to save progress:', error);
+    });
+  }
+  
   setTimeout(() => {
     // START: Added confetti
     if (typeof confetti === 'function') {
@@ -678,7 +742,9 @@ function showHowToPlay() {
   // Start game when "Got it!" is clicked
   startGameButton.onclick = () => {
     howToPlay.classList.add("hidden");
-    startGame(1);
+    // Start from the highest level the player has reached
+    const startLevel = gameManager ? gameManager.getStartLevel() : 1;
+    startGame(startLevel);
   };
 }
 

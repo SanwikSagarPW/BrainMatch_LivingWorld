@@ -301,6 +301,9 @@ window.startTimer = function(duration) {
 // COMPLETION
 // ====================================================================
 
+// Expose analytics instance globally for progress system
+window.gameAnalytics = analytics;
+
 console.log('[Analytics] Integration loaded successfully');
 console.log('[Analytics] Tracking enabled for:');
 console.log('  - Campaign levels (start, win, fail)');

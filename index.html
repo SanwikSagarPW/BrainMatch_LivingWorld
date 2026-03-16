@@ -154,10 +154,17 @@
     <!-- 1. Analytics Library (FIRST) -->
     <script src="js-analytics-bridge/analytics-bridge.js"></script>
     
-    <!-- 2. Game Code (SECOND) -->
+    <!-- 2. Progress System (BEFORE game code) -->
+    <script src="progress files/config.js"></script>
+    <script src="progress files/progressBridge.js"></script>
+    <script src="progress files/storageManager.js"></script>
+    <script src="progress files/validator.js"></script>
+    <script src="progress files/gameManager.js"></script>
+    
+    <!-- 3. Game Code -->
     <script src="script.js"></script>
     
-    <!-- 3. Analytics Integration (LAST) -->
+    <!-- 4. Analytics Integration (LAST) -->
     <script src="analytics-integration.js"></script>
 </body>
 </html>
