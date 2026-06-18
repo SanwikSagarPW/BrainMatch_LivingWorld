@@ -17,7 +17,7 @@ const sessionID = `session_${Date.now()}_${Math.random().toString(36).substr(2, 
 
 // Initialize Analytics Manager
 const analytics = new AnalyticsManager();
-analytics.initialize('BrainMatch', sessionID);
+analytics.initialize('BrainMatch_LivingWorld', sessionID);
 
 console.log(`[Analytics] Initialized with Session ID: ${sessionID}`);
 
@@ -201,10 +201,8 @@ window.handleCampaignWin = function() {
     analytics.addRawMetric('mode', 'campaign');
     
     // Submit report
-    analytics.submitReport();
-    
+    // Do NOT submit here — wait for all 3 levels to finish on the final score screen
     console.log(`[Analytics] Completed Level: ${currentLevelId}, Success: true, Time: ${duration}ms, XP: ${xp}, Stars: ${stars}`);
-    console.log('[Analytics] Report submitted');
   } catch (error) {
     console.error('[Analytics] Error in handleCampaignWin hook:', error);
   }
@@ -240,11 +238,9 @@ window.handleReflexModeEnd = function() {
     analytics.addRawMetric('stars', stars.toString());
     analytics.addRawMetric('mode', 'reflex');
     
-    // Submit report
+    // Reflex is standalone — submit immediately
     analytics.submitReport();
-    
     console.log(`[Analytics] Completed Reflex Mode: Success: true, Time: ${duration}ms, Moves: ${turns}, Stars: ${stars}`);
-    console.log('[Analytics] Report submitted');
   } catch (error) {
     console.error('[Analytics] Error in handleReflexModeEnd hook:', error);
   }
@@ -276,12 +272,12 @@ window.startTimer = function(duration) {
           // Add failure metrics
           analytics.addRawMetric('reason', 'timeout');
           analytics.addRawMetric('turns', window.gameState.turns.toString());
+          const earnedSoFar = window.totalCampaignXP || 0;
+          analytics.addRawMetric('total_xp_at_failure', earnedSoFar.toString());
           
-          // Submit report
+          // Submit once on failure with campaign XP earned so far
           analytics.submitReport();
-          
-          console.log(`[Analytics] Level Failed: ${currentLevelId}, Reason: Timeout`);
-          console.log('[Analytics] Report submitted');
+          console.log(`[Analytics] Level Failed: ${currentLevelId}, Reason: Timeout, XP so far: ${earnedSoFar}`);
         }
       } catch (error) {
         console.error('[Analytics] Error in alert hook:', error);
@@ -295,6 +291,35 @@ window.startTimer = function(duration) {
   }
   
   return result;
+};
+
+// ====================================================================
+// HOOK: FINAL SCORE SCREEN — single submit with full campaign XP
+// ====================================================================
+
+const originalShowFinalScoreScreen = window.showFinalScoreScreen;
+window.showFinalScoreScreen = function() {
+  try {
+    const totalXP = window.totalCampaignXP || 0;
+    const totalTurns = window.totalCampaignTurns || 0;
+
+    let finalStars = 1;
+    if (totalXP >= 150) finalStars = 3;
+    else if (totalXP >= 70) finalStars = 2;
+
+    analytics.addRawMetric('campaign_complete', 'true');
+    analytics.addRawMetric('total_campaign_xp', totalXP.toString());
+    analytics.addRawMetric('total_campaign_turns', totalTurns.toString());
+    analytics.addRawMetric('final_stars', finalStars.toString());
+
+    // Single report for the entire 3-level campaign
+    analytics.submitReport();
+    console.log(`[Analytics] Campaign complete — final report submitted. Total XP: ${totalXP}, Stars: ${finalStars}`);
+  } catch (error) {
+    console.error('[Analytics] Error in showFinalScoreScreen hook:', error);
+  }
+
+  return originalShowFinalScoreScreen.call(this);
 };
 
 // ====================================================================
