@@ -124,7 +124,7 @@ async function initializeProgressSystem() {
       progressBridge,
       storageManager,
       validator,
-      analyticsBridge: typeof AnalyticsManager !== 'undefined' ? AnalyticsManager.getInstance() : null, // Analytics bridge for auto-save payloads
+      analyticsBridge: null, // analytics payload sent once at campaign end via analytics-integration.js
       config: CONFIG
     });
     
