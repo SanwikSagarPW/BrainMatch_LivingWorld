@@ -272,7 +272,7 @@ window.startTimer = function(duration) {
           // Add failure metrics
           analytics.addRawMetric('reason', 'timeout');
           analytics.addRawMetric('turns', window.gameState.turns.toString());
-          const earnedSoFar = window.totalCampaignXP || 0;
+          const earnedSoFar = analytics._reportData.xpEarnedTotal || 0;
           analytics.addRawMetric('total_xp_at_failure', earnedSoFar.toString());
           
           // Submit once on failure with campaign XP earned so far
@@ -300,8 +300,7 @@ window.startTimer = function(duration) {
 const originalShowFinalScoreScreen = window.showFinalScoreScreen;
 window.showFinalScoreScreen = function() {
   try {
-    const totalXP = window.totalCampaignXP || 0;
-    const totalTurns = window.totalCampaignTurns || 0;
+    const totalXP = analytics._reportData.xpEarnedTotal || 0;
 
     let finalStars = 1;
     if (totalXP >= 150) finalStars = 3;
@@ -309,11 +308,7 @@ window.showFinalScoreScreen = function() {
 
     analytics.addRawMetric('campaign_complete', 'true');
     analytics.addRawMetric('total_campaign_xp', totalXP.toString());
-    analytics.addRawMetric('total_campaign_turns', totalTurns.toString());
     analytics.addRawMetric('final_stars', finalStars.toString());
-
-    // Override xpEarnedTotal so the host app receives the exact in-game score for high score comparison
-    analytics._reportData.xpEarnedTotal = totalXP;
 
     // Single report for the entire 3-level campaign
     analytics.submitReport();
