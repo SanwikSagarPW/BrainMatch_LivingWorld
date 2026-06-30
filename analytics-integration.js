@@ -93,7 +93,7 @@ const originalHandleCorrectMatch = window.handleCorrectMatch;
 window.handleCorrectMatch = function() {
   try {
     // Capture game state BEFORE calling original function
-    const flippedCards = window.gameState.flippedCards;
+    const flippedCards = gameState.flippedCards;
     
     if (flippedCards && flippedCards.length === 2) {
       const card1 = flippedCards[0];
@@ -132,7 +132,7 @@ const originalHandleIncorrectMatch = window.handleIncorrectMatch;
 window.handleIncorrectMatch = function() {
   try {
     // Capture game state BEFORE calling original function
-    const flippedCards = window.gameState.flippedCards;
+    const flippedCards = gameState.flippedCards;
     
     if (flippedCards && flippedCards.length === 2) {
       const card1 = flippedCards[0];
@@ -172,8 +172,8 @@ const originalHandleCampaignWin = window.handleCampaignWin;
 window.handleCampaignWin = function() {
   try {
     // Capture game state BEFORE calling original function
-    const level = window.gameState.currentCampaignLevel;
-    const turns = window.gameState.turns;
+    const level = gameState.currentCampaignLevel;
+    const turns = gameState.turns;
     
     // Calculate duration
     const duration = Date.now() - levelStartTime;
@@ -219,7 +219,7 @@ const originalHandleReflexModeEnd = window.handleReflexModeEnd;
 window.handleReflexModeEnd = function() {
   try {
     // Capture game state BEFORE calling original function
-    const turns = window.gameState.turns;
+    const turns = gameState.turns;
     
     // Calculate duration
     const duration = Date.now() - levelStartTime;
@@ -271,7 +271,7 @@ window.startTimer = function(duration) {
           
           // Add failure metrics
           analytics.addRawMetric('reason', 'timeout');
-          analytics.addRawMetric('turns', window.gameState.turns.toString());
+          analytics.addRawMetric('turns', gameState.turns.toString());
           const earnedSoFar = analytics._reportData.xpEarnedTotal || 0;
           analytics.addRawMetric('total_xp_at_failure', earnedSoFar.toString());
           
